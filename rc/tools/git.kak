@@ -1,3 +1,6 @@
+declare-option -docstring "shell command run git, useful for directory manipulation (git -C p/a/t/h)" \
+    str gitcmd 'git'
+
 declare-option -docstring "name of the client in which documentation is to be displayed" \
     str docsclient
 
@@ -132,10 +135,10 @@ define-command -params 1.. \
         ;
     else
         case "$1" in
-            commit) printf -- "--amend\n--no-edit\n--all\n--reset-author\n--fixup\n--squash\n"; git ls-files -m ;;
-            add) git ls-files -dmo --exclude-standard ;;
+            commit) printf -- "--amend\n--no-edit\n--all\n--reset-author\n--fixup\n--squash\n"; ${kak_opt_gitcmd} ls-files -m ;;
+            add) ${kak_opt_gitcmd} ls-files -dmo --exclude-standard ;;
             apply) printf -- "--reverse\n--cached\n--index\n--3way\n" ;;
-            grep|edit) git ls-files -c --recurse-submodules ;;
+            grep|edit) ${kak_opt_gitcmd} ls-files -c --recurse-submodules ;;
         esac
     fi
   } \
@@ -164,7 +167,7 @@ define-command -params 1.. \
         esac
         output=$(mktemp -d "${TMPDIR:-/tmp}"/kak-git.XXXXXXXX)/fifo
         mkfifo ${output}
-        ( trap - INT QUIT; git "$@" > ${output} 2>&1 & ) > /dev/null 2>&1 < /dev/null
+        ( trap - INT QUIT; ${kak_opt_gitcmd} "$@" > ${output} 2>&1 & ) > /dev/null 2>&1 < /dev/null
 
         printf %s "evaluate-commands -try-client '$kak_opt_docsclient' '
                   edit! -fifo ${output} *git*
@@ -363,7 +366,7 @@ define-command -params 1.. \
     }
 
     run_git_cmd() {
-        if git "${@}" > /dev/null 2>&1; then
+        if ${kak_opt_gitcmd} "${@}" > /dev/null 2>&1; then
           printf %s "echo -markup '{Information}git $1 succeeded'"
         else
           printf 'fail git %s failed\n' "$1"
@@ -762,7 +765,7 @@ define-command -params 1.. \
             shift
             enquoted="$(printf '"%s" ' "$@")"
             printf %s "try %{
-                set-option current grepcmd 'git grep -n --column'
+                set-option current grepcmd '$kak_opt_gitcmd grep -n --column'
                 grep $enquoted
                 set-option current grepcmd '$kak_opt_grepcmd'
             }"
@@ -783,5 +786,5 @@ define-command -params 1.. \
 define-command git-diff-goto-source \
     -docstring 'Navigate to source by pressing the enter key in hunks when git diff is displayed. Works within :git diff and :git show' %{
     require-module diff
-    diff-jump %sh{ git rev-parse --show-toplevel }
+    diff-jump %sh{ ${kak_opt_gitcmd} rev-parse --show-toplevel }
 }
