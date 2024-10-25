@@ -36,7 +36,7 @@ define-command -hidden -params ..3 man-impl %{ evaluate-commands %sh{
     manout=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
     manerr=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
     colout=$(mktemp "${TMPDIR:-/tmp}"/kak-man.XXXXXX)
-    env MANWIDTH=${kak_window_range##* } man "$@" > "$manout" 2> "$manerr"
+    env MANWIDTH=${kak_window_range##* } man "$@" | sed -e 's/\x1b\[[0-9;]*m//g' > "$manout" 2> "$manerr"
     retval=$?
     if command -v col >/dev/null; then
         col -b -x > ${colout} < ${manout}
