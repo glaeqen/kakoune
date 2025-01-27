@@ -1,3 +1,6 @@
+declare-option -docstring "git custom working directory" \
+    str git_work_tree
+
 declare-option -docstring "name of the client in which documentation is to be displayed" \
     str docsclient
 
@@ -131,11 +134,15 @@ define-command -params 1.. \
             update-diff \
         ;
     else
+        if [ -n "${kak_opt_git_work_tree}" ]
+        then
+            git_wt="-C ${kak_opt_git_work_tree}"
+        fi
         case "$1" in
-            commit) printf -- "--amend\n--no-edit\n--all\n--reset-author\n--fixup\n--squash\n"; git ls-files -m ;;
-            add) git ls-files -dmo --exclude-standard ;;
+            commit) printf -- "--amend\n--no-edit\n--all\n--reset-author\n--fixup\n--squash\n"; git ${git_wt} ls-files -m ;;
+            add) git ${git_wt} ls-files -dmo --exclude-standard ;;
             apply) printf -- "--reverse\n--cached\n--index\n--3way\n" ;;
-            grep|edit) git ls-files -c --recurse-submodules ;;
+            grep|edit) git ${git_wt} ls-files -c --recurse-submodules ;;
         esac
     fi
   } \
@@ -153,6 +160,10 @@ define-command -params 1.. \
 
     show_git_cmd_output() {
         local filetype
+        if [ -n "${kak_opt_git_work_tree}" ]
+        then
+            git_wt="-C ${kak_opt_git_work_tree}"
+        fi
 
         case "$1" in
            diff) filetype=git-diff ;;
@@ -164,7 +175,7 @@ define-command -params 1.. \
         esac
         output=$(mktemp -d "${TMPDIR:-/tmp}"/kak-git.XXXXXXXX)/fifo
         mkfifo ${output}
-        ( trap - INT QUIT; git "$@" > ${output} 2>&1 & ) > /dev/null 2>&1 < /dev/null
+        ( trap - INT QUIT; git ${git_wt} "$@" > ${output} 2>&1 & ) > /dev/null 2>&1 < /dev/null
 
         printf %s "evaluate-commands -try-client '$kak_opt_docsclient' '
                   edit! -fifo ${output} *git*
@@ -363,7 +374,11 @@ define-command -params 1.. \
     }
 
     run_git_cmd() {
-        if git "${@}" > /dev/null 2>&1; then
+        if [ -n "${kak_opt_git_work_tree}" ]
+        then
+            git_wt="-C ${kak_opt_git_work_tree}"
+        fi
+        if git ${git_wt} "${@}" > /dev/null 2>&1; then
           printf %s "echo -markup '{Information}git $1 succeeded'"
         else
           printf 'fail git %s failed\n' "$1"
@@ -761,8 +776,12 @@ define-command -params 1.. \
         grep)
             shift
             enquoted="$(printf '"%s" ' "$@")"
+            if [ -n "${kak_opt_git_work_tree}" ]
+            then
+                git_wt="-C ${kak_opt_git_work_tree}"
+            fi
             printf %s "try %{
-                set-option current grepcmd 'git grep -n --column'
+                set-option current grepcmd 'git $git_wt grep -n --column'
                 grep $enquoted
                 set-option current grepcmd '$kak_opt_grepcmd'
             }"
@@ -783,5 +802,11 @@ define-command -params 1.. \
 define-command git-diff-goto-source \
     -docstring 'Navigate to source by pressing the enter key in hunks when git diff is displayed. Works within :git diff and :git show' %{
     require-module diff
-    diff-jump %sh{ git rev-parse --show-toplevel }
-}
+    diff-jump %sh{
+        if [ -n "${kak_opt_git_work_tree}" ]
+        then
+            git_wt="-C ${kak_opt_git_work_tree}"
+        fi
+        git ${git_wt} rev-parse --show-toplevel
+    }
+    }
